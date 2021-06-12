@@ -2,7 +2,11 @@
     Compute depth maps for images in the input folder.
 """
 
+import argparse
+import imageio
+import matplotlib.pyplot as plt
 import os
+import platform
 import glob
 import torch
 import cv2
@@ -15,10 +19,10 @@ import sys
 
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 # RESIZE_W_1, RESIZE_H_1 = 640, 360
 VIZ = False
+
 
 def read_image(path):
     """Read image and output RGB image (0-1).
@@ -37,7 +41,8 @@ def read_image(path):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
 
     return img
-    
+
+
 def _minify(basedir, factors=[], resolutions=[]):
     '''
         Minify the images to small resolution for training
@@ -54,16 +59,17 @@ def _minify(basedir, factors=[], resolutions=[]):
             needtoload = True
     if not needtoload:
         return
-    
+
     from shutil import copy
     from subprocess import check_output
     import glob
 
     imgdir = os.path.join(basedir, 'images')
     imgs = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir))]
-    imgs = [f for f in imgs if any([f.endswith(ex) for ex in ['JPG', 'jpg', 'png', 'jpeg', 'PNG']])]
+    imgs = [f for f in imgs if any(
+        [f.endswith(ex) for ex in ['JPG', 'jpg', 'png', 'jpeg', 'PNG']])]
     imgdir_orig = imgdir
-    
+
     wd = os.getcwd()
 
     for r in factors + resolutions:
@@ -77,17 +83,17 @@ def _minify(basedir, factors=[], resolutions=[]):
         imgdir = os.path.join(basedir, name)
         if os.path.exists(imgdir):
             continue
-            
+
         print('Minifying', r, basedir)
-        
+
         os.makedirs(imgdir)
         check_output('cp {}/* {}'.format(imgdir_orig, imgdir), shell=True)
-        
+
         ext = imgs[0].split('.')[-1]
         print(ext)
         # sys.exit()
-        img_path_list = glob.glob(os.path.join(imgdir, '*.%s'%ext))
-        
+        img_path_list = glob.glob(os.path.join(imgdir, '*.%s' % ext))
+
         for img_path in img_path_list:
             save_path = img_path.replace('.jpg', '.png')
             img = cv2.imread(img_path)
@@ -95,10 +101,10 @@ def _minify(basedir, factors=[], resolutions=[]):
             print(img.shape, r)
             # sys.exit()
 
-            cv2.imwrite(save_path, 
-                        cv2.resize(img, 
-                                (r[1], r[0]), 
-                                interpolation=cv2.INTER_AREA))
+            cv2.imwrite(save_path,
+                        cv2.resize(img,
+                                   (r[1], r[0]),
+                                   interpolation=cv2.INTER_AREA))
 
         if ext != 'png':
             check_output('rm {}/*.{}'.format(imgdir, ext), shell=True)
@@ -106,10 +112,10 @@ def _minify(basedir, factors=[], resolutions=[]):
         print('Done')
 
 
-to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
-import imageio
+def to8b(x): return (255*np.clip(x, 0, 1)).astype(np.uint8)
 
-def run(basedir, input_path, output_path, model_path, 
+
+def run(basedir, input_path, output_path, model_path,
         input_w=640, input_h=360, resize_height=288):
     """Run MonoDepthNN to compute depth maps.
 
@@ -120,8 +126,8 @@ def run(basedir, input_path, output_path, model_path,
     """
     print("initialize")
 
-    img0 = [os.path.join(basedir, 'images', f) \
-            for f in sorted(os.listdir(os.path.join(basedir, 'images'))) \
+    img0 = [os.path.join(basedir, 'images', f)
+            for f in sorted(os.listdir(os.path.join(basedir, 'images')))
             if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')][0]
     sh = cv2.imread(img0).shape
     height = resize_height
@@ -130,14 +136,15 @@ def run(basedir, input_path, output_path, model_path,
     _minify(basedir, resolutions=[[height, width]])
 
     # select device
-    device = torch.device("cuda")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: %s" % device)
     # sys.exit()
 
-    small_img_dir = input_path + '_*x' + str(resize_height) + '/'
-    print(small_img_dir)
+    small_img_dir = os.path.abspath(input_path + '_*x' + str(resize_height) + '/')
+    print(glob.glob(small_img_dir)[0])
 
-    small_img_path = sorted(glob.glob(glob.glob(small_img_dir)[0] + '/*.png'))[0]
+    small_img_path = sorted(
+        glob.glob(glob.glob(small_img_dir)[0] + '/*.png'))[0]
 
     small_img = cv2.imread(small_img_path)
 
@@ -155,8 +162,8 @@ def run(basedir, input_path, output_path, model_path,
                 resize_method="upper_bound",
                 image_interpolation_method=cv2.INTER_AREA,
             ),
-            NormalizeImage(mean=[0.485, 0.456, 0.406], 
-                        std=[0.229, 0.224, 0.225]),
+            NormalizeImage(mean=[0.485, 0.456, 0.406],
+                           std=[0.229, 0.224, 0.225]),
             PrepareForNet(),
         ]
     )
@@ -188,8 +195,8 @@ def run(basedir, input_path, output_path, model_path,
             prediction = (
                 torch.nn.functional.interpolate(
                     prediction.unsqueeze(1),
-                    size=[small_img.shape[0], 
-                        small_img.shape[1]],
+                    size=[small_img.shape[0],
+                          small_img.shape[1]],
                     mode="nearest",
                 )
                 .squeeze()
@@ -202,17 +209,16 @@ def run(basedir, input_path, output_path, model_path,
             output_path, os.path.splitext(os.path.basename(img_name))[0]
         )
 
-
         if VIZ:
             if not os.path.exists('./midas_otuputs'):
                 os.makedirs('./midas_otuputs')
 
             plt.figure(figsize=(12, 6))
-            plt.subplot(1,2,1)
+            plt.subplot(1, 2, 1)
             plt.imshow(img)
-            plt.subplot(1,2,2)
-            plt.imshow(prediction, cmap='jet') 
-            plt.savefig('./midas_otuputs/%s'%(img_name.split('/')[-1]))
+            plt.subplot(1, 2, 2)
+            plt.imshow(prediction, cmap='jet')
+            plt.savefig('./midas_otuputs/%s' % (img_name.split('/')[-1]))
             plt.close()
 
         print(filename + '.npy')
@@ -220,11 +226,10 @@ def run(basedir, input_path, output_path, model_path,
 
     print("finished")
 
-import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=str, 
+    parser.add_argument("--data_path", type=str,
                         help='COLMAP Directory')
     parser.add_argument("--input_w", type=int, default=640,
                         help='input image width for monocular depth network')
@@ -249,7 +254,5 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # compute depth maps
-    run(BASE_DIR, INPUT_PATH, OUTPUT_PATH, MODEL_PATH, 
+    run(BASE_DIR, INPUT_PATH, OUTPUT_PATH, MODEL_PATH,
         args.input_w, args.input_h, args.resize_height)
-
-

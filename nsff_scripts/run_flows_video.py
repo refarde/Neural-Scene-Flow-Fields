@@ -21,7 +21,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-DEVICE = 'cuda'
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # INPUT_W = 768 #, IMG_H = 1024, 576
 VIZ = False
 
@@ -37,9 +37,12 @@ def run_maskrcnn(model, img_path, intWidth=1024, intHeight=576):
     o_image = PIL.Image.open(img_path)
     image = o_image.resize((intWidth, intHeight), PIL.Image.ANTIALIAS)
 
-    image_tensor = torchvision.transforms.functional.to_tensor(image).cuda()
-
-    tenHumans = torch.FloatTensor(intHeight, intWidth).fill_(1.0).cuda()
+    if DEVICE == 'cuda':
+        image_tensor = torchvision.transforms.functional.to_tensor(image).cuda()
+        tenHumans = torch.FloatTensor(intHeight, intWidth).fill_(1.0).cuda()
+    else:
+        image_tensor = torchvision.transforms.functional.to_tensor(image)
+        tenHumans = torch.FloatTensor(intHeight, intWidth).fill_(1.0)
 
     objPredictions = model([image_tensor])[0]
 
@@ -172,11 +175,17 @@ def motion_segmentation(basedir, threshold,
     img_path_list = sorted(glob.glob(os.path.join(img_dir, '*.jpg'))) \
                     + sorted(glob.glob(os.path.join(img_dir, '*.png')))
     semantic_mask_dir = os.path.join(basedir, 'semantic_mask')
-    netMaskrcnn = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True).cuda().eval()
+
+    if DEVICE == 'cuda':
+        netMaskrcnn = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True).cuda().eval()
+    else:
+        netMaskrcnn = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True).eval()
+
     os.makedirs(semantic_mask_dir, exist_ok=True)
 
     for i in range(0, len(img_path_list)):
         img_path = img_path_list[i]
+        img_path = img_path.replace("\\", "/")
         img_name = img_path.split('/')[-1]
         semantic_mask = run_maskrcnn(netMaskrcnn, img_path,
                                      input_semantic_w, 
@@ -195,6 +204,7 @@ def motion_segmentation(basedir, threshold,
     semantic_dir = os.path.join(basedir, 'semantic_mask')
 
     for mask_path in mask_path_list:
+        mask_path = mask_path.replace("\\", "/")
         print(mask_path)
 
         motion_mask = cv2.imread(mask_path)
@@ -203,6 +213,7 @@ def motion_segmentation(basedir, threshold,
         motion_mask = motion_mask[:, :, 0] > 0.1
 
         # combine from motion segmentation
+        print(os.path.join(semantic_dir, mask_path.split('/')[-1]))
         semantic_mask = cv2.imread(os.path.join(semantic_dir, mask_path.split('/')[-1]))
         semantic_mask = cv2.resize(semantic_mask, (resized_width, resized_height), 
                                 interpolation=cv2.INTER_NEAREST)
@@ -300,7 +311,7 @@ def compute_fwdbwd_mask(fwd_flow, bwd_flow):
 
 def run_optical_flows(args):
     model = torch.nn.DataParallel(RAFT(args))
-    model.load_state_dict(torch.load(args.model))
+    model.load_state_dict(torch.load(args.model, map_location=DEVICE))
 
     model = model.module
     model.to(DEVICE)

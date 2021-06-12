@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 from run_nerf_helpers import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -86,7 +85,7 @@ from poseInterpolator import *
 def render_slowmo_bt(disps, render_poses, bt_poses, 
                      hwf, chunk, render_kwargs, 
                      gt_imgs=None, savedir=None, 
-                     render_factor=0, target_idx=10):
+                     render_factor=0, width=512, target_idx=10):
     # import scipy.io
 
     H, W, focal = hwf
@@ -182,9 +181,9 @@ def render_slowmo_bt(disps, render_poses, bt_poses,
         # final_depth = torch.clamp(final_depth/percentile(final_depth, 98), 0., 1.) 
         # depth8 = to8b(final_depth.permute(1, 2, 0).repeat(1, 1, 3).cpu().numpy())
 
-        start_y = (rgb8.shape[1] - 512) // 2
-        rgb8 = rgb8[:, start_y:start_y+ 512, :]
-        # depth8 = depth8[:, start_y:start_y+ 512, :]
+        start_y = (rgb8.shape[1] - width) // 2
+        rgb8 = rgb8[:, start_y:start_y+ width, :]
+        # depth8 = depth8[:, start_y:start_y+ width, :]
 
         filename = os.path.join(save_img_dir, '{:03d}.jpg'.format(i))
         imageio.imwrite(filename, rgb8)
@@ -196,6 +195,7 @@ def render_lockcam_slowmo(ref_c2w, num_img,
                         hwf, chunk, render_kwargs, 
                         gt_imgs=None, savedir=None, 
                         render_factor=0,
+                        width=512,
                         target_idx=5):
 
     H, W, focal = hwf
@@ -274,8 +274,8 @@ def render_lockcam_slowmo(ref_c2w, num_img,
         filename = os.path.join(savedir, '%03d.jpg'%(i))
         rgb8 = to8b(final_rgb.permute(1, 2, 0).cpu().numpy())
 
-        start_y = (rgb8.shape[1] - 512) // 2
-        rgb8 = rgb8[:, start_y:start_y+ 512, :]
+        start_y = (rgb8.shape[1] - width) // 2
+        rgb8 = rgb8[:, start_y:start_y+ width, :]
 
         imageio.imwrite(filename, rgb8)
 
@@ -629,7 +629,7 @@ def render(img_idx, chain_bwd, chain_5frames,
 
 
 def render_bullet_time(render_poses, img_idx_embed, num_img, 
-                    hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
+                    hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, width=512, render_factor=0):
 
     H, W, focal = hwf
 
@@ -743,7 +743,7 @@ def create_nerf(args):
         ckpt_path = ckpts[-1]
 
         print('Reloading from', ckpt_path)
-        ckpt = torch.load(ckpt_path)
+        ckpt = torch.load(ckpt_path, map_location=device)
 
         start = ckpt['global_step'] + 1
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])

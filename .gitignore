@@ -1,0 +1,6 @@
+nsff_data/**/*
+.vscode
+__pycache__
+model.pt
+models.zip*
+*.pth
