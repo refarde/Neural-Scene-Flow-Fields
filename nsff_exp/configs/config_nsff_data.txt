@@ -8,12 +8,10 @@ dataset_type = llff
 factor = 2
 llffhold = 10
 
-N_rand = 1024
+N_rand = 512
 N_samples = 128
 N_importance = 0
 netwidth = 256
-final_height = 288
-final_width = 512
 
 use_viewdirs = True
 raw_noise_std = 1e0
@@ -35,4 +33,4 @@ w_cycle = 1.0
 w_prob_reg = 0.1
 
 start_frame = 0
-end_frame = 24
+end_frame = 29

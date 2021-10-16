@@ -6,7 +6,7 @@ import configargparse
 parser = configargparse.ArgumentParser()
 parser.add_argument('--input_path', type=str, help='Video file path')
 parser.add_argument('--output_dir', type=str,
-                    default="./nsff_data/dense/images", help='output images\' directory path')
+                    default="./nsff_data/images", help='output images\' directory path')
 args = parser.parse_args()
 input = args.input_path
 output = args.output_dir

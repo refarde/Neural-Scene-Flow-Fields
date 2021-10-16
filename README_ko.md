@@ -16,7 +16,7 @@
 ## 필요 모듈 설치
 ### pytorch
 ```bash
-$ pip3 install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+$ pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio===0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
 ```
 ### cupy
 ```bash
@@ -33,19 +33,35 @@ $ pip3 install tensorboard --upgrade
    만약 동영상에서 프레임을 추출해 사용한다면 아래 명령 실행
     ```bash
     # 아래 명령 실행시, nsff_data/dense/images 폴더 안에 동영상의 프레임이 6 프레임 간격으로 최대 30개의 파일이 추출됨.
-    $ Python mp42png.py --input_path /Path/of/video.mp4
+    $ python mp42png.py --input_path /Path/of/video.mp4
     ```
 2. [COLMAP](https://demuc.de/colmap/)을 이용하여 sparse 데이터 추출
-    1. colmap 앱을 실행 실행
-    2. File > New Project로 프로젝트 생성
-    3. Processing > Feature extraction 실행 후,   
-       Camera model을 PINHOLE로 변경 후에
-       Extract 클릭
-    4. Processing > Feature matching 실행 후,
-       Exhaustive 탭에서 Run 클릭
-    5. Reconstruction > Start reconstruction 실행
-    6. File > Extract model 실행 후   
-       생성된 파일(camera.bin 등)을 nsff_data/dense/sparse 폴더로 이동
+   1. UI를 사용할 경우
+      1. colmap 앱을 실행 실행
+      2. File > New Project로 프로젝트 생성
+      3. Processing > Feature extraction 실행 후,   
+         Camera model을 PINHOLE로 변경 후에
+         Extract 클릭
+      4. Processing > Feature matching 실행 후,
+         Exhaustive 탭에서 Run 클릭
+      5. Reconstruction > Start reconstruction 실행
+      6. File > Extract model 실행 후   
+         생성된 파일(camera.bin 등)을 nsff_data/dense/sparse 폴더로 이동
+   2. cli 를 사용할 경우
+      ```bash
+      $ ../COLMAP-3.6-windows-cuda/colmap.bat feature_extractor --database_path ./nsff_data/database.db --image_path ./nsff_data/images --ImageReader.camera_model PINHOLE --ImageReader.single_camera 1 --ImageReader.mask_path ./nsff_data/colmap_masks
+
+      $ ../COLMAP-3.6-windows-cuda/colmap.bat sequential_matcher --database_path ./nsff_data/database.db
+
+      $ mkdir ./nsff_data/sparse
+
+      $ ../COLMAP-3.6-windows-cuda/colmap.bat mapper --database_path ./nsff_data/database.db --image_path ./nsff_data/images --output_path ./nsff_data/sparse
+
+      $ mkdir ./nsff_data/dense
+
+      $ ../COLMAP-3.6-windows-cuda/colmap.bat image_undistorter --image_path ./nsff_data/images --input_path ./nsff_data/sparse/0 --output_path ./nsff_data/dense --output_type COLMAP
+      ```
+
 3. 데이터 전처리   
    1. Single view depth prediction model 파일인 "model.pt"을 [link](https://drive.google.com/drive/folders/1G-NFZKEA8KSWojUKecpJPVoq5XCjBLOV?usp=sharing)로 부터 다운로드 받고, "nsff_scripts" 폴더 안에 넣음.
 
@@ -55,7 +71,7 @@ $ pip3 install tensorboard --upgrade
       # create camera intrinsics/extrinsic format for NSFF, same as original NeRF where it uses imgs2poses.py script from the LLFF code: https://github.com/Fyusion/LLFF/blob/master/imgs2poses.py
       $ python save_poses_nerf.py --data_path "../nsff_data/dense/"
       # Resize input images and run single view model
-      $ python run_midas.py --data_path "../nsff_data/dense/" --input_w 1920 --input_h 1080 --resize_height 288
+      $ python run_midas.py --data_path "../nsff_data/dense/" --input_w 640 --input_h 360 --resize_height 288
       # Run optical flow model (for easy setup and Pytorch version consistency, we use RAFT as backbond optical flow model, but should be easy to change to other models such as PWC-Net or FlowNet2.0)
       $ ./download_models.sh
       $ python run_flows_video.py --model models/raft-things.pth --data_path ../nsff_data/dense/ --epi_threshold 1.0 --input_flow_w 768 --input_semantic_w 1024 --input_semantic_h 576
